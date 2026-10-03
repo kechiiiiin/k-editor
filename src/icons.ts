@@ -3,14 +3,18 @@
 // 見出し・太字・取消線は、図形より文字の形のほうが伝わるので文字の記号にする。
 import type { ToolbarItem } from './toolbar.js';
 
-type IconItem = Exclude<ToolbarItem, '|'>;
+export type IconItem = Exclude<ToolbarItem, '|'>;
+
+/** 使う側が差し替えるアイコン。文字列は HTML としてそのまま入れる（使う側が渡すものなので信頼する。ユーザー入力は渡さないこと）。要素はボタンごとに複製し、関数はボタンごとに呼ぶ */
+export type IconSource = string | HTMLElement | (() => HTMLElement);
+export type KEditorIcons = Partial<Record<IconItem, IconSource>>;
 
 const svg = (body: string): string =>
   `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${body}</svg>`;
 
 const glyph = (text: string, cls: string): string => `<span class="k-editor-glyph ${cls}" aria-hidden="true">${text}</span>`;
 
-export const ICONS: Record<IconItem, string> = {
+export const DEFAULT_ICONS: Record<IconItem, string> = {
   photo: svg('<rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>'),
   embed: svg('<rect width="20" height="16" x="2" y="4" rx="2"/><path d="m10 9 5 3-5 3z"/>'),
   h2: glyph('H2', 'k-editor-glyph-h'),
@@ -25,3 +29,17 @@ export const ICONS: Record<IconItem, string> = {
   undo: svg('<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11"/>'),
   redo: svg('<path d="m15 14 5-5-5-5"/><path d="M20 9H9.5A5.5 5.5 0 0 0 4 14.5A5.5 5.5 0 0 0 9.5 20H13"/>'),
 };
+
+/** ボタンにアイコンを入れる。要素は複製・関数は呼び直すので、同じ要素が二か所に入って片方から消えることはない */
+export function applyIcon(button: HTMLElement, item: IconItem, icons?: KEditorIcons): void {
+  const src = icons?.[item];
+  if (src === undefined) {
+    button.innerHTML = DEFAULT_ICONS[item];
+  } else if (typeof src === 'string') {
+    button.innerHTML = src; // 使う側が渡すもの。信頼する
+  } else if (typeof src === 'function') {
+    button.replaceChildren(src());
+  } else {
+    button.replaceChildren(src.cloneNode(true));
+  }
+}

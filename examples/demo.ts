@@ -42,6 +42,8 @@ function renderEmbed(url: string): HTMLElement | null {
 const editor = createEditor(document.getElementById('editor')!, {
   markdown: sample,
   placeholder: 'いま、何が浮かびましたか',
+  // アイコンの差し替えの例（太字だけ。ほかは既定）。名前は labels のまま
+  icons: { bold: '<strong aria-hidden="true">太</strong>' },
   uploadImage,
   renderEmbed,
   fetchCard: async (url) => (url.startsWith('https://example.com/') ? { title: '例のページ', description: 'fetchCard が返したカード', domain: 'example.com' } : null),

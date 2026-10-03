@@ -12,6 +12,7 @@ export {
   type EmbedResult,
 } from './editor.js';
 export { DEFAULT_TOOLBAR } from './toolbar.js';
+export { DEFAULT_ICONS, type IconItem, type IconSource, type KEditorIcons } from './icons.js';
 export {
   parseMarkdown,
   serializeMarkdown,

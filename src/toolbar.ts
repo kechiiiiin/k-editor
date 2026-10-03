@@ -1,7 +1,7 @@
 // 上に貼り付くツールバーと、URL を入れる小さな欄（prompt() は使わない。iOS で辛いため）。
 import type { Editor } from '@tiptap/core';
 import type { KEditorLabels } from './editor.js';
-import { ICONS } from './icons.js';
+import { applyIcon, type KEditorIcons } from './icons.js';
 
 export type ToolbarItem =
   | 'photo'
@@ -41,6 +41,7 @@ export const DEFAULT_TOOLBAR: ToolbarItem[] = [
 interface ToolbarDeps {
   items: ToolbarItem[];
   labels: KEditorLabels;
+  icons?: KEditorIcons;
   isBlockUrl: (line: string) => boolean;
   onPhoto: () => Promise<void>;
   onEmbed: (url: string) => boolean;
@@ -80,7 +81,7 @@ export class Toolbar {
       b.type = 'button';
       b.className = `k-editor-btn k-editor-btn-${item}`;
       // 見た目は記号だけ。名前は読み上げ（aria-label）と、マウスを乗せたとき（title）に出す
-      b.innerHTML = ICONS[item];
+      applyIcon(b, item, deps.icons);
       b.setAttribute('aria-label', deps.labels[item]);
       b.title = deps.labels[item];
       b.dataset.item = item;
@@ -148,7 +149,7 @@ export class Toolbar {
     if (b) {
       // 送っている間だけ進み具合を文字で出し、終わったら記号に戻す
       if (label) b.textContent = label;
-      else b.innerHTML = ICONS.photo;
+      else applyIcon(b, 'photo', this.deps.icons);
       b.classList.toggle('k-editor-btn-busy', !!label);
       b.disabled = !!label;
     }

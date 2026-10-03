@@ -57,13 +57,34 @@ const editor = createEditor(document.getElementById('editor')!, {
   fetchCard: async (url) => myCard(url),  // { title, description?, domain?, image? } か null
   isBlockUrl: (line) => /^https?:\/\/\S+$/.test(line),
   toolbar: ['photo', 'embed', '|', 'h2', 'h3', 'bold', 'strike', 'link', '|', 'bulletList', 'orderedList', 'blockquote', 'hr', '|', 'undo', 'redo'],
-  labels: { photo: 'Photo' },             // 文言の差し替え
+  labels: { photo: 'Photo' },             // 文言の差し替え（aria-label と title に出る）
+  icons: { bold: '<b>太</b>', link: () => myLinkIcon() }, // アイコンの差し替え。無いものは既定
 });
 
 editor.getMarkdown();
 editor.setMarkdown('…');  // onChange は呼ばない・履歴にも積まない
 editor.destroy();
 ```
+
+### アイコン
+
+ツールバーのアイコンは `icons` で使う側から差し替えられます。値は文字列（HTML として入れる）・要素・要素を返す関数のどれか。渡さなかったボタンは既定のまま、名前（aria-label・title）は今までどおり `labels` から出ます。
+
+```ts
+import { createEditor, DEFAULT_ICONS, type IconItem } from 'k-editor';
+
+createEditor(el, {
+  icons: {
+    bold: '<svg viewBox="0 0 24 24" width="18" height="18">…</svg>', // 文字列は HTML としてそのまま入れる
+    link: myLinkElement,          // 要素はボタンごとに複製する（同じ要素が二か所に入っても消えない）
+    undo: () => makeUndoIcon(),   // 関数はボタンごとに呼ぶ
+  },
+});
+```
+
+- 文字列は `innerHTML` で入れます。使う側が渡すものなので信頼しています。ユーザーの入力など信頼できないものは渡さないでください
+- 写真のアップロード中は進み具合の文字に変わり、終わると差し替えたアイコンに戻ります
+- 既定のアイコン（`DEFAULT_ICONS`）の線の図形は [Lucide](https://lucide.dev)（ISC License・Copyright (c) Lucide Contributors）から写したものです。見出し・太字・取消線は文字の記号です
 
 ライブラリは使う側のことを知りません。写真の置き場・埋め込みの判別と描き方・カードの中身は、関数で外から渡します。カードの文字は必ずテキストとして描きます（HTML にしません）。画像の URL の安全性は渡す側で確かめてください。
 

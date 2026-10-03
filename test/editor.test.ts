@@ -132,6 +132,62 @@ describe('ツールバー', () => {
     expect(items).toEqual(['photo', 'embed', 'h2', 'h3', 'bold', 'strike', 'link', 'bulletList', 'orderedList', 'blockquote', 'hr', 'undo', 'redo']);
   });
 
+  describe('icons', () => {
+    const btn = (ed: KEditor, item: string) => ed.root.querySelector(`.k-editor-btn-${item}`) as HTMLButtonElement;
+
+    it('文字列は HTML として入る', () => {
+      const ed = mount({ icons: { bold: '<i class="mine">太</i>' } });
+      expect(btn(ed, 'bold').querySelector('i.mine')?.textContent).toBe('太');
+    });
+
+    it('要素は複製され、同じ要素を二か所に渡しても両方に入る', () => {
+      const el = document.createElement('span');
+      el.className = 'shared';
+      el.textContent = 'X';
+      const ed = mount({ icons: { bold: el, strike: el } });
+      expect(btn(ed, 'bold').querySelector('.shared')?.textContent).toBe('X');
+      expect(btn(ed, 'strike').querySelector('.shared')?.textContent).toBe('X');
+      expect(btn(ed, 'bold').querySelector('.shared')).not.toBe(btn(ed, 'strike').querySelector('.shared'));
+      expect(el.parentElement).toBeNull();
+    });
+
+    it('関数はボタンごとに呼ばれる', () => {
+      const make = vi.fn(() => {
+        const s = document.createElement('span');
+        s.className = 'gen';
+        return s;
+      });
+      const ed = mount({ icons: { bold: make, strike: make } });
+      expect(make).toHaveBeenCalledTimes(2);
+      expect(btn(ed, 'bold').querySelector('.gen')).not.toBeNull();
+      expect(btn(ed, 'strike').querySelector('.gen')).not.toBeNull();
+    });
+
+    it('渡さないボタンは既定のまま・aria-label と title は labels のまま', () => {
+      const ed = mount({ icons: { bold: '<i>太</i>' }, labels: { bold: 'ふとい' } });
+      expect(btn(ed, 'link').querySelector('svg')).not.toBeNull();
+      expect(btn(ed, 'h2').querySelector('.k-editor-glyph')).not.toBeNull();
+      expect(btn(ed, 'bold').getAttribute('aria-label')).toBe('ふとい');
+      expect(btn(ed, 'bold').title).toBe('ふとい');
+    });
+
+    it('写真のアップロードが終わると差し替えたアイコンに戻る', async () => {
+      let done!: (u: string) => void;
+      const ed = mount({
+        icons: { photo: '<b class="mine">写</b>' },
+        uploadImage: () => new Promise<string>((r) => (done = r)),
+        pickImages: async () => [new File([new Uint8Array([1])], 'a.png', { type: 'image/png' })],
+      });
+      expect(btn(ed, 'photo').querySelector('.mine')).not.toBeNull();
+      btn(ed, 'photo').click();
+      await vi.waitFor(() => expect(btn(ed, 'photo').classList.contains('k-editor-btn-busy')).toBe(true));
+      expect(btn(ed, 'photo').querySelector('.mine')).toBeNull();
+      done('/p/a.jpg');
+      await vi.waitFor(() => expect(btn(ed, 'photo').classList.contains('k-editor-btn-busy')).toBe(false));
+      expect(btn(ed, 'photo').querySelector('.mine')?.textContent).toBe('写');
+    });
+  });
+
   it('uploadImage が無ければ写真の道具は出さない', () => {
     const ed = mount();
     expect(ed.root.querySelector('.k-editor-btn-photo')).toBeNull();

@@ -13,6 +13,7 @@ import Strike from '@tiptap/extension-strike';
 import Code from '@tiptap/extension-code';
 import Blockquote from '@tiptap/extension-blockquote';
 import { Dropcursor, Gapcursor, Placeholder, UndoRedo } from '@tiptap/extensions';
+import type { KEditorIcons } from './icons.js';
 import { defaultIsBlockUrl, parseMarkdown, serializeMarkdown, type JSONNode } from './markdown.js';
 import {
   KBulletList,
@@ -106,6 +107,8 @@ export interface KEditorOptions {
   /** 出す道具と並び。'|' は区切り。false で出さない */
   toolbar?: ToolbarItem[] | false;
   labels?: Partial<KEditorLabels>;
+  /** ツールバーのアイコンの差し替え。渡さなかったボタンは既定（DEFAULT_ICONS）。文字列は HTML として入れる（使う側が渡すものなので信頼する）。要素はボタンごとに複製、関数はボタンごとに呼ぶ。名前は labels から */
+  icons?: KEditorIcons;
   /** 失敗の知らせ（既定はエディタの下に文字で出す） */
   onError?: (message: string) => void;
   /** 読み込み時にどの規則で素の文字に倒したか（検査用） */
@@ -474,6 +477,7 @@ export function createEditor(el: HTMLElement, options: KEditorOptions = {}): KEd
     ? new Toolbar(toolbarHost, editor, {
         items: options.uploadImage ? items : items.filter((i) => i !== 'photo'),
         labels,
+        icons: options.icons,
         isBlockUrl,
         onPhoto: async () => {
           const files = await (options.pickImages ?? defaultPickImages)();
