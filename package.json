@@ -1,6 +1,6 @@
 {
   "name": "k-editor",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Markdown を読み書きする、小さな WYSIWYG エディタ（Tiptap / ProseMirror の上に素の DOM で）",
   "type": "module",
   "license": "MIT",
