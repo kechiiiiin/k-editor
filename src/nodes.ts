@@ -275,7 +275,7 @@ export const KHorizontalRule = HorizontalRule.extend({
   addAttributes() {
     return { markup: { default: '---', ...hidden } };
   },
-});
+}).configure({ HTMLAttributes: { class: 'k-editor-hr' } });
 
 export const KCodeBlock = CodeBlock.extend({
   addAttributes() {

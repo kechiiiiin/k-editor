@@ -131,13 +131,18 @@
   border-left: 3px solid var(--k-editor-line);
   color: var(--k-editor-muted);
 }
-.k-editor-prose hr {
+.k-editor-prose hr,
+.k-editor-hr {
+  /* 中央寄せの短い破線。エディタ自体の罫線（全幅の実線）と別物に見せる。使う側は .k-editor-hr で上書きできる */
   border: none;
-  border-top: 1px solid var(--k-editor-line);
-  margin: .8em 0;
+  border-top: 2px dashed var(--k-editor-muted);
+  width: 40%;
+  margin: 16px auto;
   padding: 0;
+  opacity: .7;
 }
-.k-editor-prose hr.ProseMirror-selectednode { border-top-color: var(--k-editor-accent); }
+.k-editor-prose hr.ProseMirror-selectednode,
+.k-editor-hr.ProseMirror-selectednode { border-top-color: var(--k-editor-accent); opacity: 1; }
 .k-editor-prose pre {
   margin: 0;
   padding: .6em .8em;
