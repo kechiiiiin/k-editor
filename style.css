@@ -47,8 +47,12 @@
   font-size: 12px;
   font-weight: 500;
   line-height: 1;
-  padding: 8px 9px;
+  padding: 0 8px;
+  min-width: 34px;
   min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 2px;
   cursor: pointer;
   white-space: nowrap;
@@ -60,8 +64,13 @@
 @media (hover: hover) {
   .k-editor-btn:hover:not(:disabled) { color: var(--k-editor-fg); }
 }
-.k-editor-btn-bold { font-weight: 800; }
-.k-editor-btn-strike { text-decoration: line-through; }
+.k-editor-btn svg { display: block; }
+.k-editor-btn-busy { font-size: 12px; }
+/* 文字の記号（見出し・太字・取消線）。線の図形と大きさを揃える */
+.k-editor-glyph { display: block; font-size: 16px; line-height: 18px; font-family: ui-sans-serif, -apple-system, "Helvetica Neue", Arial, sans-serif; }
+.k-editor-glyph-h { font-size: 13px; font-weight: 700; letter-spacing: -.02em; }
+.k-editor-glyph-bold { font-weight: 800; }
+.k-editor-glyph-strike { text-decoration: line-through; }
 .k-editor-sep { flex: none; width: 1px; height: 18px; background: var(--k-editor-line); margin: 0 4px; }
 
 /* URL を入れる欄 */

@@ -1,6 +1,7 @@
 // 上に貼り付くツールバーと、URL を入れる小さな欄（prompt() は使わない。iOS で辛いため）。
 import type { Editor } from '@tiptap/core';
 import type { KEditorLabels } from './editor.js';
+import { ICONS } from './icons.js';
 
 export type ToolbarItem =
   | 'photo'
@@ -78,7 +79,10 @@ export class Toolbar {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = `k-editor-btn k-editor-btn-${item}`;
-      b.textContent = deps.labels[item];
+      // 見た目は記号だけ。名前は読み上げ（aria-label）と、マウスを乗せたとき（title）に出す
+      b.innerHTML = ICONS[item];
+      b.setAttribute('aria-label', deps.labels[item]);
+      b.title = deps.labels[item];
       b.dataset.item = item;
       // ⚠️ 押してもエディタのフォーカスと選択を奪わない（iOS でキーボードが閉じない・選択が残る）
       b.addEventListener('mousedown', (e) => e.preventDefault());
@@ -142,7 +146,10 @@ export class Toolbar {
     this.busyLabel = label;
     const b = this.buttons.get('photo');
     if (b) {
-      b.textContent = label ?? this.deps.labels.photo;
+      // 送っている間だけ進み具合を文字で出し、終わったら記号に戻す
+      if (label) b.textContent = label;
+      else b.innerHTML = ICONS.photo;
+      b.classList.toggle('k-editor-btn-busy', !!label);
       b.disabled = !!label;
     }
   }
