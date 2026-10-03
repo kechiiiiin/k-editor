@@ -1,0 +1,4 @@
+node_modules
+dist
+examples/demo.js
+.DS_Store
