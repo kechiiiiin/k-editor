@@ -1,4 +1,4 @@
-// ツールバー（上に貼り付く／下に固定する）と、URL を入れる小さな欄（prompt() は使わない。iOS で辛いため）。
+// ツールバー（本文の上に、または本文の下に貼り付く）と、URL を入れる小さな欄（prompt() は使わない。iOS で辛いため）。
 import type { Editor } from '@tiptap/core';
 import type { KEditorLabels } from './editor.js';
 import { applyIcon, type KEditorIcons } from './icons.js';

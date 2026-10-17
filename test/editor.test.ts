@@ -351,100 +351,43 @@ describe('貼り付けは文字だけ', () => {
 });
 
 describe('ツールバーの置き場所', () => {
-  it('既定は上（下置きの印も持ち上げも付かない）', () => {
+  it('既定は上（本文の前に置く）', () => {
     const ed = mount({ markdown: 'あ' });
-    expect(ed.root.classList.contains('k-editor-dock')).toBe(false);
     const wrap = ed.root.querySelector('.k-editor-toolbar-wrap')!;
-    expect(wrap.classList.contains('k-editor-dock-off')).toBe(false);
+    const content = ed.root.querySelector('.k-editor-content')!;
+    expect(ed.root.classList.contains('k-editor-toolbar-bottom')).toBe(false);
     expect(ed.root.firstElementChild).toBe(wrap);
+    expect(wrap.nextElementSibling).toBe(content);
   });
 
-  it("'bottom' は下置きの印が付き、出ているのは一つだけ（後から作ったもの・フォーカスを受けたもの）", () => {
-    const a = mount({ markdown: 'あ', toolbarPosition: 'bottom' });
-    const b = mount({ markdown: 'い', toolbarPosition: 'bottom' });
-    const wa = a.root.querySelector('.k-editor-toolbar-wrap')!;
-    const wb = b.root.querySelector('.k-editor-toolbar-wrap')!;
-    expect(a.root.classList.contains('k-editor-dock')).toBe(true);
-    expect(wa.classList.contains('k-editor-dock-off')).toBe(true);
-    expect(wb.classList.contains('k-editor-dock-off')).toBe(false);
-    a.tiptap.view.dom.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
-    expect(wa.classList.contains('k-editor-dock-off')).toBe(false);
-    expect(wb.classList.contains('k-editor-dock-off')).toBe(true);
-    // その場で開いた欄は、前にフォーカスを受けた欄より優先
-    const c = mount({ markdown: 'う', toolbarPosition: 'bottom' });
-    const wc = c.root.querySelector('.k-editor-toolbar-wrap')!;
-    expect(wc.classList.contains('k-editor-dock-off')).toBe(false);
-    expect(wa.classList.contains('k-editor-dock-off')).toBe(true);
-    c.destroy();
-    editors = editors.filter((e) => e !== c);
-    expect(wa.classList.contains('k-editor-dock-off')).toBe(false);
-    // 出ていた方を外すと、残った方が出る
-    a.destroy();
-    editors = editors.filter((e) => e !== a);
-    expect(wb.classList.contains('k-editor-dock-off')).toBe(false);
-  });
-
-  it('外すと visualViewport・window の見張りを解く', () => {
-    const vv = new EventTarget() as EventTarget & { height: number; offsetTop: number };
-    vv.height = 500;
-    vv.offsetTop = 0;
-    Object.defineProperty(window, 'visualViewport', { value: vv, configurable: true });
-    const vvAdd = vi.spyOn(vv, 'addEventListener');
-    const vvRemove = vi.spyOn(vv, 'removeEventListener');
-    const winAdd = vi.spyOn(window, 'addEventListener');
-    const winRemove = vi.spyOn(window, 'removeEventListener');
-    try {
-      const ed = mount({ markdown: 'あ', toolbarPosition: 'bottom' });
-      const added = vvAdd.mock.calls.map((c) => c[0]).sort();
-      expect(added).toEqual(['resize', 'scroll']);
-      const winResize = winAdd.mock.calls.filter((c) => c[0] === 'resize').map((c) => c[1]);
-      ed.destroy();
-      editors = editors.filter((e) => e !== ed);
-      for (const [type, fn] of vvAdd.mock.calls) {
-        expect(vvRemove.mock.calls.some((c) => c[0] === type && c[1] === fn)).toBe(true);
-      }
-      for (const fn of winResize) {
-        expect(winRemove.mock.calls.some((c) => c[0] === 'resize' && c[1] === fn)).toBe(true);
-      }
-      expect(document.documentElement.style.getPropertyValue('--k-editor-dock-height')).toBe('');
-    } finally {
-      vvAdd.mockRestore();
-      vvRemove.mockRestore();
-      winAdd.mockRestore();
-      winRemove.mockRestore();
-      delete (window as { visualViewport?: unknown }).visualViewport;
-    }
-  });
-
-  it('キーボードが開いて見えている範囲が縮んだら、その差だけ持ち上げる', async () => {
-    const vv = new EventTarget() as EventTarget & { height: number; offsetTop: number };
-    vv.height = window.innerHeight;
-    vv.offsetTop = 0;
-    Object.defineProperty(window, 'visualViewport', { value: vv, configurable: true });
-    try {
-      const ed = mount({ markdown: 'あ', toolbarPosition: 'bottom' });
-      const wrap = ed.root.querySelector<HTMLElement>('.k-editor-toolbar-wrap')!;
-      expect(wrap.style.bottom).toBe('');
-      vv.height = window.innerHeight - 300;
-      vv.dispatchEvent(new Event('resize'));
-      await new Promise((r) => requestAnimationFrame(() => r(null)));
-      expect(wrap.style.bottom).toBe('300px');
-      expect(wrap.classList.contains('k-editor-dock-lifted')).toBe(true);
-      vv.height = window.innerHeight;
-      vv.dispatchEvent(new Event('resize'));
-      await new Promise((r) => requestAnimationFrame(() => r(null)));
-      expect(wrap.style.bottom).toBe('');
-      expect(wrap.classList.contains('k-editor-dock-lifted')).toBe(false);
-    } finally {
-      delete (window as { visualViewport?: unknown }).visualViewport;
-    }
+  it("'bottom' は本文の直後に置き、下置きの印を付ける", () => {
+    const ed = mount({ markdown: 'あ', toolbarPosition: 'bottom' });
+    const wrap = ed.root.querySelector('.k-editor-toolbar-wrap')!;
+    const content = ed.root.querySelector('.k-editor-content')!;
+    expect(ed.root.classList.contains('k-editor-toolbar-bottom')).toBe(true);
+    expect(ed.root.firstElementChild).toBe(content);
+    expect(content.nextElementSibling).toBe(wrap);
+    // 道具も URL の欄も上置きと同じものが入っている
+    expect(wrap.querySelector('.k-editor-toolbar')).not.toBeNull();
+    expect(wrap.querySelector('.k-editor-urlbar')).not.toBeNull();
   });
 
   it('下置きでも IME の変換の確定の Enter で段落を割らない', () => {
     const ed = mount({ markdown: 'あ', toolbarPosition: 'bottom' });
-    const dom = ed.tiptap.view.dom;
-    const e = keydown(dom, { key: 'Enter', keyCode: 229 });
+    const e = keydown(ed.tiptap.view.dom, { key: 'Enter', keyCode: 229 });
     expect(e.defaultPrevented).toBe(true);
     expect(ed.getMarkdown()).toBe('あ');
+  });
+
+  it('下置きの見た目は sticky の bottom（style.css）', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const css = readFileSync(resolve(__dirname, '../style.css'), 'utf8');
+    const rule = css.match(/\.k-editor-toolbar-bottom \.k-editor-toolbar-wrap \{([^}]*)\}/)?.[1] ?? '';
+    expect(rule).toMatch(/bottom:\s*0/);
+    expect(rule).toMatch(/top:\s*auto/);
+    expect(rule).toMatch(/safe-area-inset-bottom/);
+    expect(css).not.toMatch(/k-editor-dock/);
+    expect(css).not.toMatch(/position:\s*fixed/);
   });
 });
