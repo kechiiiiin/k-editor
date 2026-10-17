@@ -28,6 +28,7 @@ import {
   type LinkCardData,
 } from './nodes.js';
 import { Toolbar, type ToolbarItem, DEFAULT_TOOLBAR } from './toolbar.js';
+import { BottomDock } from './dock.js';
 
 export type { ToolbarItem } from './toolbar.js';
 export type { LinkCardData, EmbedResult } from './nodes.js';
@@ -86,6 +87,8 @@ export const DEFAULT_LABELS: KEditorLabels = {
   removeImage: 'この写真を外す',
 };
 
+export type KEditorToolbarPosition = 'top' | 'bottom';
+
 export interface KEditorOptions {
   /** 最初の本文（Markdown） */
   markdown?: string;
@@ -106,6 +109,12 @@ export interface KEditorOptions {
   isBlockUrl?: (line: string) => boolean;
   /** 出す道具と並び。'|' は区切り。false で出さない */
   toolbar?: ToolbarItem[] | false;
+  /**
+   * ツールバーの置き場所。既定は 'top'（本文の上に貼り付く）。
+   * 'bottom' は画面の下端に固定し、ソフトキーボードが開いているときはキーボードのすぐ上に出す（iPhone Safari 向け）。
+   * エディタが画面の外に出たら引っ込める。下置きのエディタが複数あるときは、いちばん最近作られた・フォーカスを受けたものだけ出す
+   */
+  toolbarPosition?: KEditorToolbarPosition;
   labels?: Partial<KEditorLabels>;
   /** ツールバーのアイコンの差し替え。渡さなかったボタンは既定（DEFAULT_ICONS）。文字列は HTML として入れる（使う側が渡すものなので信頼する）。要素はボタンごとに複製、関数はボタンごとに呼ぶ。名前は labels から */
   icons?: KEditorIcons;
@@ -488,6 +497,27 @@ export function createEditor(el: HTMLElement, options: KEditorOptions = {}): KEd
       })
     : null;
 
+  // 下置き: 画面の下端（キーボードが開いていればその上）に固定する
+  const dock =
+    toolbar && options.toolbarPosition === 'bottom'
+      ? new BottomDock(root, toolbarHost, () => {
+          if (!editor.isFocused) return null;
+          try {
+            const c = editor.view.coordsAtPos(editor.state.selection.head);
+            return { top: c.top, bottom: c.bottom };
+          } catch {
+            return null;
+          }
+        })
+      : null;
+  const follow = (): void => {
+    if (editor.isFocused) dock?.follow();
+  };
+  if (dock) {
+    editor.on('selectionUpdate', follow);
+    editor.on('update', follow);
+  }
+
   loadMarkdown(options.markdown ?? '');
 
   return {
@@ -503,6 +533,11 @@ export function createEditor(el: HTMLElement, options: KEditorOptions = {}): KEd
     insertImages,
     insertUrl,
     destroy: () => {
+      if (dock) {
+        editor.off('selectionUpdate', follow);
+        editor.off('update', follow);
+        dock.destroy();
+      }
       toolbar?.destroy();
       editor.destroy();
       root.remove();

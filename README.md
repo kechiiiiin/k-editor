@@ -2,7 +2,7 @@
 
 Markdown を読んで Markdown を書き戻す、小さな WYSIWYG エディタ。[Tiptap](https://tiptap.dev/)（ProseMirror）の上に、素の DOM で載ります。Preact 用の薄い包みも付いています。
 
-- 上に貼り付くツールバー: 写真／埋め込み（URL）／見出し・小見出し／太字／取り消し線／リンク／箇条書き／番号付き／引用／区切り線／戻す・やり直す（斜体はありません）
+- ツールバー（本文の上に貼り付く・または画面の下端に固定）: 写真／埋め込み（URL）／見出し・小見出し／太字／取り消し線／リンク／箇条書き／番号付き／引用／区切り線／戻す・やり直す（斜体はありません）
 - 写真・埋め込み・リンクカードは本文の中にそのまま見え、× で外せます
 - 写真はボタン・ドラッグ＆ドロップ・貼り付け（画像だけのとき）で入ります
 - 他所からの貼り付けは**文字だけ**（HTML の書式は持ち込みません）
@@ -38,7 +38,7 @@ serializeMarkdown(parseMarkdown(md)) === md   // どんな md でも
 npm には公開していません。GitHub のタグから入れます（`prepare` でビルドされます）。
 
 ```sh
-npm i github:kechiiiiin/k-editor#v0.1.0
+npm i github:kechiiiiin/k-editor#v0.3.0
 ```
 
 ## 使い方（素の DOM）
@@ -59,6 +59,7 @@ const editor = createEditor(document.getElementById('editor')!, {
   toolbar: ['photo', 'embed', '|', 'h2', 'h3', 'bold', 'strike', 'link', '|', 'bulletList', 'orderedList', 'blockquote', 'hr', '|', 'undo', 'redo'],
   labels: { photo: 'Photo' },             // 文言の差し替え（aria-label と title に出る）
   icons: { bold: '<b>太</b>', link: () => myLinkIcon() }, // アイコンの差し替え。無いものは既定
+  toolbarPosition: 'top',                 // 'top'（既定・本文の上に貼り付く）か 'bottom'（画面の下端に固定）
 });
 
 editor.getMarkdown();
@@ -86,6 +87,24 @@ createEditor(el, {
 - 写真のアップロード中は進み具合の文字に変わり、終わると差し替えたアイコンに戻ります
 - 既定のアイコン（`DEFAULT_ICONS`）の線の図形は [Lucide](https://lucide.dev)（ISC License・Copyright (c) Lucide Contributors）から写したものです。見出し・太字・取消線は文字の記号です
 
+### ツールバーを下に置く（`toolbarPosition: 'bottom'`）
+
+長く書くと本文が下へ伸び、上のツールバーまで戻らないと写真を上げられない。そのための形です。
+
+```ts
+createEditor(el, { toolbarPosition: 'bottom' });
+// Preact: <KEditor toolbarPosition="bottom" … />（作るときに一度だけ読む）
+```
+
+- ツールバーは**画面の下端に固定**し、iPhone でソフトキーボードが開いているときは**キーボードのすぐ上**に出します。iOS Safari の `position: fixed; bottom: 0` は layout viewport の下端に付いてキーボードに隠れるため、`visualViewport` の `resize`・`scroll` を見て、見えている範囲の下端との差だけ持ち上げます
+- キーボードが閉じているときは `env(safe-area-inset-bottom)` の分だけ内側に余白を取ります（`viewport-fit=cover` のページでホームバーと重ならない）
+- 本文の下にツールバーの高さぶんの余白（`padding-bottom: var(--k-editor-toolbar-h)`）を取り、打っている間はカーソルがツールバーの裏に入らないようスクロールします。エディタの下に別のものが続くページでは `.k-editor-dock { padding-bottom: 0 }` で外して、ページの側で余白を取ってもかまいません
+- エディタが画面の外に出たら引っ込め、`destroy()` で見張り（`visualViewport`・`resize`・`IntersectionObserver`・`ResizeObserver`）を解きます
+- 一つのページに下置きのエディタが複数あるときは、画面に入っているもののうち**いちばん最近作られた・フォーカスを受けたもの**だけを出します（その場で開いた編集欄は開いた時点で優先、前の欄に触れればそちらへ）
+- 出している間は `<html>` に `--k-editor-dock-height`（ツールバーの高さ）を置きます。下に固定の知らせ等を持ち上げるのに使えます（例: `bottom: calc(24px + var(--k-editor-dock-height, 0px))`）
+- URL を入れる欄はボタンの列の上に出ます。狭い画面で横にすべらせる・マウスの画面で折り返すのは上置きと同じです
+- ⚠️ `position: fixed` なので、エディタの祖先に `transform`・`filter`・`backdrop-filter` があると画面ではなくその箱に付きます
+
 ライブラリは使う側のことを知りません。写真の置き場・埋め込みの判別と描き方・カードの中身は、関数で外から渡します。カードの文字は必ずテキストとして描きます（HTML にしません）。画像の URL の安全性は渡す側で確かめてください。
 
 ## Preact
@@ -111,7 +130,7 @@ DOM に依存しないので Node でも動きます。`onFallback(rule)` で、
 
 ## 見た目
 
-`style.css` の変数で差し替えます: `--k-editor-bg` `--k-editor-fg` `--k-editor-muted` `--k-editor-line` `--k-editor-accent` `--k-editor-sticky-top`（上に固定のヘッダがあるときその高さ）`--k-editor-font-size`。ツールバーは狭い画面では横にすべらせ、マウスの画面では折り返します。
+`style.css` の変数で差し替えます: `--k-editor-bg` `--k-editor-fg` `--k-editor-muted` `--k-editor-line` `--k-editor-accent` `--k-editor-sticky-top`（上に固定のヘッダがあるときその高さ）`--k-editor-font-size`。下置きでは `--k-editor-dock-width`（中身の最大幅・本文の段と揃えるとき）`--k-editor-dock-gutter`（左右の余白）`--k-editor-dock-z`（重なり順・既定 40）も。ツールバーは狭い画面では横にすべらせ、マウスの画面では折り返します。
 
 ## デモ
 

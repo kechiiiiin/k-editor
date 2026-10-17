@@ -2,6 +2,11 @@
  *   --k-editor-bg / --k-editor-fg / --k-editor-muted / --k-editor-line / --k-editor-accent
  *   --k-editor-sticky-top  ツールバーが貼り付く高さ（上に固定のヘッダがあるときその高さ）
  *   --k-editor-font-size   本文の文字の大きさ（iOS の自動ズームを避けるため 16px 以上）
+ *   下置き（toolbarPosition: 'bottom'）のとき:
+ *   --k-editor-dock-width  下のツールバーの中身の最大幅（本文の段と揃えるとき。既定は全幅）
+ *   --k-editor-dock-gutter 下のツールバーの左右の余白
+ *   --k-editor-dock-z      下のツールバーの重なり順
+ *   --k-editor-toolbar-h   （エディタが書き込む）下のツールバーの高さ。本文の下にこの分の余白を取る
  */
 .k-editor {
   --k-editor-bg: #fff;
@@ -72,6 +77,37 @@
 .k-editor-glyph-bold { font-weight: 800; }
 .k-editor-glyph-strike { text-decoration: line-through; }
 .k-editor-sep { flex: none; width: 1px; height: 18px; background: var(--k-editor-line); margin: 0 4px; }
+
+/* ---- 下置き（toolbarPosition: 'bottom'）。画面の下端に固定し、キーボードが開いていればその上へ（位置は JS が bottom で持ち上げる） ---- */
+.k-editor-dock {
+  /* 本文の最後の行がツールバーの裏に入らないよう、ツールバーの高さぶん下を空ける */
+  padding-bottom: var(--k-editor-toolbar-h, 0px);
+}
+.k-editor-dock .k-editor-toolbar-wrap {
+  position: fixed;
+  top: auto;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: var(--k-editor-dock-z, 40);
+  margin: 0;
+  border-bottom: none;
+  border-top: 1px solid var(--k-editor-line);
+  padding: 0 var(--k-editor-dock-gutter, 12px) env(safe-area-inset-bottom, 0px);
+  /* URL の欄はボタンの列の上に出す（指の近くに列、その上に欄） */
+  display: flex;
+  flex-direction: column-reverse;
+}
+/* キーボードの上に出ている間は、ホームバーの余白は要らない */
+.k-editor-dock .k-editor-toolbar-wrap.k-editor-dock-lifted { padding-bottom: 0; }
+.k-editor-dock .k-editor-toolbar-wrap.k-editor-dock-off { display: none; }
+.k-editor-dock .k-editor-toolbar,
+.k-editor-dock .k-editor-urlbar {
+  width: 100%;
+  max-width: var(--k-editor-dock-width, none);
+  margin: 0 auto;
+}
+.k-editor-dock .k-editor-urlbar { padding: 8px 0 0; }
 
 /* URL を入れる欄 */
 .k-editor-urlbar { display: flex; gap: 6px; align-items: center; padding: 0 0 8px; }

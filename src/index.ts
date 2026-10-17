@@ -7,6 +7,7 @@ export {
   type KEditor,
   type KEditorLabels,
   type KEditorOptions,
+  type KEditorToolbarPosition,
   type ToolbarItem,
   type LinkCardData,
   type EmbedResult,
