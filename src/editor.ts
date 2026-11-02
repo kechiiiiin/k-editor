@@ -28,6 +28,7 @@ import {
   type LinkCardData,
 } from './nodes.js';
 import { Toolbar, type ToolbarItem, DEFAULT_TOOLBAR } from './toolbar.js';
+import { KWikilink } from './wikilink.js';
 
 export type { ToolbarItem } from './toolbar.js';
 export type { LinkCardData, EmbedResult } from './nodes.js';
@@ -35,6 +36,7 @@ export type { LinkCardData, EmbedResult } from './nodes.js';
 export interface KEditorLabels {
   photo: string;
   embed: string;
+  wikilink: string;
   h2: string;
   h3: string;
   bold: string;
@@ -56,6 +58,10 @@ export interface KEditorLabels {
   cancel: string;
   unlink: string;
   notUrl: string;
+  /** 言葉のリンクで、選ばれていない（空白だけも）とき */
+  wikilinkEmpty: string;
+  /** 言葉のリンクで、囲めない選択のとき（塊をまたぐ・改行や `[` `]` を含む・コードやリンクの中） */
+  wikilinkInvalid: string;
   removeBlock: string;
   removeImage: string;
 }
@@ -63,6 +69,7 @@ export interface KEditorLabels {
 export const DEFAULT_LABELS: KEditorLabels = {
   photo: '写真',
   embed: '埋め込み',
+  wikilink: '言葉のリンク',
   h2: '見出し',
   h3: '小見出し',
   bold: '太字',
@@ -82,6 +89,8 @@ export const DEFAULT_LABELS: KEditorLabels = {
   cancel: 'やめる',
   unlink: '外す',
   notUrl: '行として置ける URL ではありません',
+  wikilinkEmpty: '言葉を選んでから押します',
+  wikilinkInvalid: '1行の中の言葉を選んでください（コードの中は囲めません）',
   removeBlock: 'これを外す',
   removeImage: 'この写真を外す',
 };
@@ -106,7 +115,7 @@ export interface KEditorOptions {
   fetchCard?: (url: string) => Promise<LinkCardData | null> | LinkCardData | null;
   /** 行まるごとの URL を、埋め込み・カードの枠（urlBlock）にするか */
   isBlockUrl?: (line: string) => boolean;
-  /** 出す道具と並び。'|' は区切り。false で出さない */
+  /** 出す道具と並び。'|' は区切り。false で出さない。'wikilink'（言葉のリンク）は既定に入らないので、使うときは並びに足す */
   toolbar?: ToolbarItem[] | false;
   /**
    * ツールバーの置き場所。既定は 'top'（本文の上に置き、スクロールしても上端に貼り付く）。
@@ -281,6 +290,8 @@ export function createEditor(el: HTMLElement, options: KEditorOptions = {}): KEd
       Dropcursor.configure({ class: 'k-editor-dropcursor' }),
       Placeholder.configure({ placeholder: options.placeholder ?? '' }),
       KKeymap,
+      // 言葉のリンクは道具を出したエディタでだけ飾る
+      ...(options.toolbar && options.toolbar.includes('wikilink') ? [KWikilink] : []),
     ],
     editorProps: {
       attributes: { class: 'k-editor-prose' },

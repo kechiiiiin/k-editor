@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createEditor, type KEditor } from '../src/index';
+import { createEditor, DEFAULT_TOOLBAR, type KEditor } from '../src/index';
 import { CASES } from './cases';
 
 // 仮名だけで書く（このリポジトリは public）。
@@ -389,5 +389,409 @@ describe('ツールバーの置き場所', () => {
     expect(rule).toMatch(/safe-area-inset-bottom/);
     expect(css).not.toMatch(/k-editor-dock/);
     expect(css).not.toMatch(/position:\s*fixed/);
+  });
+});
+
+describe('言葉のリンク（wikilink）', () => {
+  const toolbar = ['photo', 'embed', '|', 'wikilink', 'h2', 'bold', '|', 'undo'] as const;
+  const mountW = (markdown: string, options: Parameters<typeof createEditor>[1] = {}): KEditor =>
+    mount({ markdown, toolbar: [...toolbar], ...options });
+  const btn = (ed: KEditor): HTMLButtonElement => ed.root.querySelector('.k-editor-btn-wikilink') as HTMLButtonElement;
+  const press = (ed: KEditor): void => btn(ed).click();
+  const select = (ed: KEditor, from: number, to = from): void => {
+    ed.tiptap.commands.setTextSelection({ from, to });
+  };
+  const type = (ed: KEditor, text: string): void => {
+    ed.tiptap.view.dispatch(ed.tiptap.state.tr.insertText(text));
+  };
+  const words = (ed: KEditor): string[] => [...ed.root.querySelectorAll('.k-editor-wikilink')].map((e) => e.textContent ?? '');
+  const brackets = (ed: KEditor): string[] => [...ed.root.querySelectorAll('.k-editor-wikilink-bracket')].map((e) => e.textContent ?? '');
+  const note = (ed: KEditor): HTMLElement => ed.root.querySelector('.k-editor-note') as HTMLElement;
+
+  describe('囲む', () => {
+    it('前後に括弧が入り、続けて打つ文字は ]] の外に入る', () => {
+      const onChange = vi.fn();
+      const ed = mountW('あいう', { onChange });
+      select(ed, 2, 3);
+      press(ed);
+      expect(ed.getMarkdown()).toBe('あ[[い]]う');
+      expect(onChange).toHaveBeenLastCalledWith('あ[[い]]う');
+      expect(ed.tiptap.state.selection.empty).toBe(true);
+      type(ed, 'か');
+      expect(ed.getMarkdown()).toBe('あ[[い]]かう');
+      expect(words(ed)).toEqual(['い']);
+    });
+
+    it('一度の「戻す」で元に戻る', () => {
+      const ed = mountW('あいう');
+      select(ed, 2, 3);
+      press(ed);
+      (ed.root.querySelector('.k-editor-btn-undo') as HTMLButtonElement).click();
+      expect(ed.getMarkdown()).toBe('あいう');
+    });
+
+    it('太字の中では括弧も太字の内側に入る', () => {
+      const ed = mountW('**あい**う');
+      select(ed, 1, 3);
+      press(ed);
+      expect(ed.getMarkdown()).toBe('**[[あい]]**う');
+      ed.setMarkdown(ed.getMarkdown());
+      expect(ed.getMarkdown()).toBe('**[[あい]]**う');
+    });
+
+    it('書式がまたがる選択では、括弧はどちらの書式にも入らない', () => {
+      const ed = mountW('**あ**い');
+      select(ed, 1, 3);
+      press(ed);
+      expect(ed.getMarkdown()).toBe('[[**あ**い]]');
+    });
+
+    it('見出し・リスト・引用の中でも囲める', () => {
+      for (const [md, want] of [
+        ['## あい', '## [[あい]]'],
+        ['- あい', '- [[あい]]'],
+        ['1. あい', '1. [[あい]]'],
+        ['> あい', '> [[あい]]'],
+      ] as const) {
+        const ed = mountW(md);
+        const at = ed.tiptap.state.doc.textContent.length;
+        const start = md.startsWith('##') ? 1 : md.startsWith('>') ? 2 : 3;
+        select(ed, start, start + at);
+        press(ed);
+        expect(ed.getMarkdown()).toBe(want);
+      }
+    });
+
+    it('前後に空白のある選択もそのまま囲む（比べるときに空白は落ちる）', () => {
+      const ed = mountW('あ い う');
+      select(ed, 3, 5);
+      press(ed);
+      expect(ed.getMarkdown()).toBe('あ [[い ]]う');
+      expect(words(ed)).toEqual(['い ']);
+    });
+  });
+
+  describe('外す', () => {
+    // あ[[いう]]え: あ=1-2 [[=2-4 いう=4-6 ]]=6-8 え=8-9
+    it('カーソルが中にあれば括弧だけ外す', () => {
+      const ed = mountW('あ[[いう]]え');
+      select(ed, 5);
+      press(ed);
+      expect(ed.getMarkdown()).toBe('あいうえ');
+      expect(words(ed)).toEqual([]);
+      expect(ed.tiptap.state.selection.from).toBe(3); // い と う の間のまま
+    });
+
+    it('言葉を選んでいても、括弧ごと選んでいても外す', () => {
+      for (const [from, to] of [
+        [4, 6],
+        [2, 8],
+        [3, 7],
+      ] as const) {
+        const ed = mountW('あ[[いう]]え');
+        select(ed, from, to);
+        press(ed);
+        expect(ed.getMarkdown()).toBe('あいうえ');
+      }
+    });
+
+    it('外して戻すと括弧が戻る・もう一度囲むと同じになる', () => {
+      const ed = mountW('あ[[いう]]え');
+      select(ed, 5);
+      press(ed);
+      (ed.root.querySelector('.k-editor-btn-undo') as HTMLButtonElement).click();
+      expect(ed.getMarkdown()).toBe('あ[[いう]]え');
+      select(ed, 4, 6);
+      press(ed);
+      select(ed, 2, 4);
+      press(ed);
+      expect(ed.getMarkdown()).toBe('あ[[いう]]え');
+    });
+
+    it('太字の中の言葉も括弧だけ外す', () => {
+      const ed = mountW('**[[あ]]**');
+      select(ed, 4);
+      press(ed);
+      expect(ed.getMarkdown()).toBe('**あ**');
+    });
+
+    it('同じ行に複数あれば、カーソルのある言葉だけ', () => {
+      const ed = mountW('[[あ]]と[[い]]');
+      select(ed, 10);
+      press(ed);
+      expect(ed.getMarkdown()).toBe('[[あ]]とい');
+    });
+  });
+
+  describe('何も変えない', () => {
+    const cases: [string, string, number, number, string][] = [
+      ['選択なし', 'あいう', 2, 2, '言葉を選んでから'],
+      ['空白だけ', 'あ   い', 2, 5, '言葉を選んでから'],
+      ['複数の塊にまたがる', '## あ\nい', 2, 5, '1行の中'],
+      ['段落の中の改行を含む', 'あ\nい', 1, 5, '1行の中'],
+      ['[ を含む', 'あ[い', 1, 4, '1行の中'],
+      ['] を含む', 'あ]い', 1, 4, '1行の中'],
+      ['言葉をまたぐ', '[[あ]]い[[う]]', 3, 11, '1行の中'],
+      ['言葉に半分かかる', 'あ[[い]]', 1, 5, '1行の中'],
+      ['括弧のすぐ外のカーソル（後ろ）', 'あ[[い]]う', 7, 7, '言葉を選んでから'],
+      ['括弧のすぐ外のカーソル（前）', 'あ[[い]]う', 2, 2, '言葉を選んでから'],
+      ['コードブロックの中', '```\nあいう\n```', 2, 4, '1行の中'],
+      ['コードブロックの中のカーソル', '```\nあいう\n```', 2, 2, '言葉を選んでから'],
+      ['インラインコードの中', 'あ`いう`え', 2, 4, '1行の中'],
+      ['インラインコードにかかる', 'あ`いう`え', 1, 3, '1行の中'],
+      ['リンクの文字', 'あ[いう](https://example.com/)え', 2, 4, '1行の中'],
+    ];
+    for (const [name, md, from, to, message] of cases) {
+      it(name, () => {
+        const onChange = vi.fn();
+        const ed = mountW(md, { onChange });
+        select(ed, from, to);
+        press(ed);
+        expect(ed.getMarkdown()).toBe(md);
+        expect(onChange).not.toHaveBeenCalled();
+        expect(note(ed).hidden).toBe(false);
+        expect(note(ed).textContent).toContain(message);
+      });
+    }
+
+    it('写真を選んでいるときも変えない', () => {
+      const ed = mountW('![](/a/1.jpg)\nあ');
+      ed.tiptap.commands.setNodeSelection(0);
+      press(ed);
+      expect(ed.getMarkdown()).toBe('![](/a/1.jpg)\nあ');
+      expect(note(ed).hidden).toBe(false);
+    });
+
+    it('文言は labels で差し替えられ、onError があればそちらへ', () => {
+      const onError = vi.fn();
+      const ed = mountW('あ\nい', { onError, labels: { wikilinkEmpty: 'えらんで', wikilinkInvalid: 'むり' } });
+      select(ed, 2);
+      press(ed);
+      expect(onError).toHaveBeenLastCalledWith('えらんで');
+      select(ed, 1, 5);
+      press(ed);
+      expect(onError).toHaveBeenLastCalledWith('むり');
+    });
+
+    it('断りは選択が動くと消え、囲めたときも残らない', () => {
+      const ed = mountW('あいう');
+      select(ed, 2);
+      press(ed);
+      expect(note(ed).hidden).toBe(false);
+      select(ed, 2, 3);
+      expect(note(ed).hidden).toBe(true);
+      select(ed, 2);
+      press(ed);
+      expect(note(ed).hidden).toBe(false);
+      ed.tiptap.commands.setTextSelection({ from: 2, to: 3 });
+      press(ed);
+      expect(note(ed).hidden).toBe(true);
+    });
+  });
+
+  describe('aria-pressed', () => {
+    it('言葉の中にカーソルがある間だけ true', () => {
+      const ed = mountW('あ[[いう]]え');
+      const pressed = (): string | null => btn(ed).getAttribute('aria-pressed');
+      expect(pressed()).toBe('false'); // 読み込んだ直後は先頭
+      select(ed, 5);
+      expect(pressed()).toBe('true');
+      select(ed, 8);
+      expect(pressed()).toBe('false');
+      select(ed, 2);
+      expect(pressed()).toBe('false');
+      select(ed, 3);
+      expect(pressed()).toBe('true');
+    });
+
+    it('囲んだ直後は外（カーソルは ]] の直後）、外した後も false', () => {
+      const ed = mountW('あいう');
+      select(ed, 2, 3);
+      press(ed);
+      expect(btn(ed).getAttribute('aria-pressed')).toBe('false');
+      select(ed, 5);
+      expect(btn(ed).getAttribute('aria-pressed')).toBe('true');
+      press(ed);
+      expect(btn(ed).getAttribute('aria-pressed')).toBe('false');
+    });
+  });
+
+  describe('飾り', () => {
+    it('括弧は薄く、中身は言葉の色の印。打つと追いかける', () => {
+      const ed = mountW('あ[[いう]]え[[か]]');
+      expect(words(ed)).toEqual(['いう', 'か']);
+      expect(brackets(ed)).toEqual(['[[', ']]', '[[', ']]']);
+      type(ed, '[[き]]');
+      expect(words(ed)).toEqual(['き', 'いう', 'か']);
+    });
+
+    it('太字・見出し・リストの中も飾る。書式の途中で切れても飾る', () => {
+      const ed = mountW('**[[あ]]**\n## [[い]]\n- [[う]]\n\n[[え**お**]]');
+      expect(words(ed)).toEqual(['あ', 'い', 'う', 'え', 'お']);
+    });
+
+    it('言葉でないものは飾らない', () => {
+      for (const md of [
+        '[[]]',
+        '[[ ]]',
+        '[[\u3000]]',
+        '[[ひらきっぱなし',
+        'とじっぱなし]]',
+        '[[あ\nい]]',
+        '[あ]',
+        '[[あ[い]]',
+        '`[[あ]]`',
+        '```\n[[あ]]\n```',
+        '[[あ]](https://example.com/)',
+        '[[[あ]]](https://example.com/)',
+        '[[あ`い`う]]',
+      ]) {
+        const ed = mountW(md);
+        expect(words(ed)).toEqual([]);
+        expect(brackets(ed)).toEqual([]);
+        expect(ed.getMarkdown()).toBe(md);
+      }
+    });
+
+    it('本文に飾りが混ざらない（文書はただの文字のまま）', () => {
+      const md = 'あ[[いう]]え';
+      const ed = mountW(md);
+      expect(ed.getMarkdown()).toBe(md);
+      expect(ed.tiptap.getJSON()).toEqual({ type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: md }] }] });
+      expect(Object.keys(ed.tiptap.schema.nodes)).not.toContain('wikilink');
+      expect(Object.keys(ed.tiptap.schema.marks)).not.toContain('wikilink');
+    });
+
+    it('setMarkdown でも飾り直す', () => {
+      const ed = mountW('あ');
+      ed.setMarkdown('[[い]]');
+      expect(words(ed)).toEqual(['い']);
+      ed.setMarkdown('い');
+      expect(words(ed)).toEqual([]);
+    });
+
+    it('外した言葉の飾りは消える', () => {
+      const ed = mountW('[[あ]]');
+      select(ed, 4);
+      press(ed);
+      expect(words(ed)).toEqual([]);
+      expect(brackets(ed)).toEqual([]);
+    });
+
+    it('見た目は変数の色で（style.css）', async () => {
+      const { readFileSync } = await import('node:fs');
+      const { resolve } = await import('node:path');
+      const css = readFileSync(resolve(__dirname, '../style.css'), 'utf8');
+      expect(css.match(/\.k-editor-wikilink \{([^}]*)\}/)?.[1]).toMatch(/var\(--k-editor-accent\)/);
+      expect(css).toMatch(/\.k-editor-wikilink-bracket \{/);
+    });
+  });
+
+  describe('往復（道具を出したエディタでも 1 文字も変わらない）', () => {
+    for (const [name, md] of Object.entries(CASES)) {
+      it(name, () => {
+        const ed = mountW(md);
+        expect(ed.getMarkdown()).toBe(md);
+      });
+    }
+
+    it('囲んだ本文を読み直しても変わらない', () => {
+      const ed = mountW('## あい\n**かき**く\n- さし');
+      select(ed, 1, 3);
+      press(ed);
+      const got = ed.getMarkdown();
+      expect(got).toBe('## [[あい]]\n**かき**く\n- さし');
+      const again = mountW(got);
+      expect(again.getMarkdown()).toBe(got);
+      expect(words(again)).toEqual(['あい']);
+    });
+  });
+
+  describe('opt-in', () => {
+    it('既定の並びに入っていない', () => {
+      expect(DEFAULT_TOOLBAR).not.toContain('wikilink');
+    });
+
+    for (const [name, options] of [
+      ['既定の並び', {}],
+      ['並びに無い', { toolbar: ['bold' as const] }],
+      ['ツールバーなし', { toolbar: false as const }],
+    ] as const) {
+      it(`${name}ならボタンも飾りも無い。本文は素の文字のまま`, () => {
+        const ed = mount({ markdown: 'あ[[い]]う', ...options });
+        expect(btn(ed)).toBeNull();
+        expect(words(ed)).toEqual([]);
+        expect(brackets(ed)).toEqual([]);
+        expect(ed.root.querySelector('.k-editor-prose')?.textContent).toBe('あ[[い]]う');
+        expect(ed.getMarkdown()).toBe('あ[[い]]う');
+      });
+    }
+
+    it('渡した並びのとおりに置く（H2 の左）・名前とアイコン', () => {
+      const ed = mountW('あ', { uploadImage: async () => '/x.jpg' });
+      const items = [...ed.root.querySelectorAll('.k-editor-btn')].map((b) => (b as HTMLElement).dataset.item);
+      expect(items.slice(0, 4)).toEqual(['photo', 'embed', 'wikilink', 'h2']);
+      expect(btn(ed).previousElementSibling?.classList.contains('k-editor-sep')).toBe(true);
+      expect(btn(ed).querySelector('.k-editor-glyph-h')?.textContent).toBe('[[ ]]');
+      expect(btn(ed).getAttribute('aria-label')).toBe('言葉のリンク');
+    });
+
+    it('名前とアイコンは差し替えられる', () => {
+      const ed = mountW('あ', { labels: { wikilink: 'ことば' }, icons: { wikilink: '<i class="mine">語</i>' } });
+      expect(btn(ed).title).toBe('ことば');
+      expect(btn(ed).querySelector('i.mine')).not.toBeNull();
+    });
+  });
+
+  describe('IME', () => {
+    it('言葉の中でも、変換中の Enter で割らない・送信しない', () => {
+      const onSubmit = vi.fn();
+      const ed = mountW('[[あい]]', { onSubmit });
+      select(ed, 4);
+      keydown(ed.tiptap.view.dom, { key: 'Enter', isComposing: true });
+      keydown(ed.tiptap.view.dom, { key: 'Enter', keyCode: 229 });
+      expect(ed.getMarkdown()).toBe('[[あい]]');
+      expect(onSubmit).not.toHaveBeenCalled();
+    });
+
+    it('変換中はボタンを押しても本文に触らない（断りも出さない）', () => {
+      const ed = mountW('あいう');
+      select(ed, 2, 3);
+      const input = (ed.tiptap.view as unknown as { input: { composing: boolean } }).input;
+      input.composing = true;
+      press(ed);
+      input.composing = false;
+      expect(ed.getMarkdown()).toBe('あいう');
+      expect(note(ed).hidden).toBe(true);
+    });
+
+    it('変換中の入力では飾りを作り直さず、変換が終わってから飾る', async () => {
+      const ed = mountW('[[あ]]い');
+      const { view } = ed.tiptap;
+      // 変換中の入力（ProseMirror は composition の印を付けて流す）
+      select(ed, 6);
+      view.dispatch(view.state.tr.insertText('[[か]]').setMeta('composition', 1));
+      expect(ed.getMarkdown()).toBe('[[あ]][[か]]い');
+      expect(words(ed)).toEqual(['あ']);
+      // 前を変えても、飾りは位置を追う
+      view.dispatch(view.state.tr.insertText('さ', 1).setMeta('composition', 1));
+      expect(words(ed)).toEqual(['あ']);
+      view.dom.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: '' }));
+      await vi.waitFor(() => expect(words(ed)).toEqual(['あ', 'か']));
+      expect(ed.getMarkdown()).toBe('さ[[あ]][[か]]い');
+    });
+
+    it('変換の終わりの飾り直しは onChange を呼ばず、壊したエディタにも触らない', async () => {
+      const onChange = vi.fn();
+      const ed = mountW('[[あ]]', { onChange });
+      ed.tiptap.view.dom.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: '' }));
+      await new Promise((r) => setTimeout(r, 80));
+      expect(onChange).not.toHaveBeenCalled();
+      const gone = mountW('[[あ]]');
+      gone.tiptap.view.dom.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: '' }));
+      gone.destroy();
+      editors = editors.filter((e) => e !== gone);
+      await new Promise((r) => setTimeout(r, 80));
+    });
   });
 });

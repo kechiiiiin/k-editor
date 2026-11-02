@@ -1,6 +1,6 @@
 // ツールバーの記号。名前（labels）は aria-label と title にだけ出す。
 // 線の図形は Lucide（https://lucide.dev・ISC License・Copyright (c) Lucide Contributors）から写した。
-// 見出し・太字・取消線は、図形より文字の形のほうが伝わるので文字の記号にする。
+// 見出し・太字・取消線・言葉のリンクは、図形より文字の形のほうが伝わるので文字の記号にする。
 import type { ToolbarItem } from './toolbar.js';
 
 export type IconItem = Exclude<ToolbarItem, '|'>;
@@ -17,6 +17,7 @@ const glyph = (text: string, cls: string): string => `<span class="k-editor-glyp
 export const DEFAULT_ICONS: Record<IconItem, string> = {
   photo: svg('<rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>'),
   embed: svg('<rect width="20" height="16" x="2" y="4" rx="2"/><path d="m10 9 5 3-5 3z"/>'),
+  wikilink: glyph('[[ ]]', 'k-editor-glyph-h'),
   h2: glyph('H2', 'k-editor-glyph-h'),
   h3: glyph('H3', 'k-editor-glyph-h'),
   bold: glyph('B', 'k-editor-glyph-bold'),

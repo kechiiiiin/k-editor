@@ -2,10 +2,12 @@
 import type { Editor } from '@tiptap/core';
 import type { KEditorLabels } from './editor.js';
 import { applyIcon, type KEditorIcons } from './icons.js';
+import { toggleWikilink, wordAround } from './wikilink.js';
 
 export type ToolbarItem =
   | 'photo'
   | 'embed'
+  | 'wikilink'
   | 'h2'
   | 'h3'
   | 'bold'
@@ -59,7 +61,14 @@ export class Toolbar {
   private mode: BarMode | null = null;
   private savedSel: { from: number; to: number } | null = null;
   private busyLabel: string | null = null;
+  private wikilinkErrorShown = false;
   private refresh = (): void => this.update();
+  /** 言葉のリンクの断りは、選択が動いたら役目を終える */
+  private clearWikilinkError = (): void => {
+    if (!this.wikilinkErrorShown) return;
+    this.wikilinkErrorShown = false;
+    this.deps.showError(null);
+  };
 
   constructor(
     host: HTMLElement,
@@ -140,6 +149,7 @@ export class Toolbar {
     host.append(this.bar, this.form);
     editor.on('transaction', this.refresh);
     editor.on('selectionUpdate', this.refresh);
+    editor.on('selectionUpdate', this.clearWikilinkError);
     this.update();
   }
 
@@ -223,6 +233,20 @@ export class Toolbar {
     this.close();
   }
 
+  private toggleWikilink(): void {
+    const { view } = this.editor;
+    // ⚠️ 変換中は本文に触らない（確定前の文字が壊れる）
+    if (view.composing) return;
+    const result = toggleWikilink(view.state);
+    this.clearWikilinkError();
+    if (typeof result !== 'string') view.dispatch(result.scrollIntoView());
+    this.editor.commands.focus();
+    if (typeof result === 'string') {
+      this.deps.showError(result === 'empty' ? this.deps.labels.wikilinkEmpty : this.deps.labels.wikilinkInvalid);
+      this.wikilinkErrorShown = true;
+    }
+  }
+
   private run(item: ToolbarItem): void {
     const c = this.editor.chain().focus();
     switch (item) {
@@ -236,6 +260,9 @@ export class Toolbar {
       case 'link':
         if (this.mode === 'link') this.close();
         else this.open('link');
+        return;
+      case 'wikilink':
+        this.toggleWikilink();
         return;
       case 'h2':
         c.toggleHeading({ level: 2 }).run();
@@ -281,6 +308,7 @@ export class Toolbar {
       strike: e.isActive('strike'),
       link: e.isActive('link') || this.mode === 'link',
       embed: this.mode === 'embed',
+      wikilink: this.buttons.has('wikilink') && !!wordAround(e.state),
       bulletList: e.isActive('bulletList'),
       orderedList: e.isActive('orderedList'),
       blockquote: e.isActive('blockquote'),
@@ -296,5 +324,6 @@ export class Toolbar {
   destroy(): void {
     this.editor.off('transaction', this.refresh);
     this.editor.off('selectionUpdate', this.refresh);
+    this.editor.off('selectionUpdate', this.clearWikilinkError);
   }
 }

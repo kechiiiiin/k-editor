@@ -17,6 +17,8 @@ const sample = [
   'https://example.com/article',
   '',
   '[リンク](https://example.com/)も書ける',
+  '',
+  '言葉を選んで [[ ]] を押すと、[[言葉のリンク]]になる',
 ].join('\n');
 
 const out = document.getElementById('out')!;
@@ -44,6 +46,8 @@ const editor = createEditor(document.getElementById('editor')!, {
   placeholder: 'いま、何が浮かびましたか',
   // アイコンの差し替えの例（太字だけ。ほかは既定）。名前は labels のまま
   icons: { bold: '<strong aria-hidden="true">太</strong>' },
+  // 言葉のリンクは既定の並びに入らない。使うときは並びに足す
+  toolbar: ['photo', 'embed', '|', 'wikilink', 'h2', 'h3', 'bold', 'strike', 'link', '|', 'bulletList', 'orderedList', 'blockquote', 'hr', '|', 'undo', 'redo'],
   uploadImage,
   renderEmbed,
   fetchCard: async (url) => (url.startsWith('https://example.com/') ? { title: '例のページ', description: 'fetchCard が返したカード', domain: 'example.com' } : null),

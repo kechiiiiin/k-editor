@@ -36,4 +36,16 @@ describe('Preact の包み', () => {
     await vi.waitFor(() => expect(ed.getMarkdown()).toBe(''));
     render(null, root);
   });
+
+  it("toolbar に 'wikilink' を渡せば、ボタンも飾りも付く", async () => {
+    const ref: { current: KEditorInstance | null } = { current: null };
+    const root = document.createElement('div');
+    document.body.appendChild(root);
+    render(h(KEditor, { value: 'あ[[い]]', onChange: () => {}, editorRef: ref, toolbar: ['wikilink', 'h2'] }), root);
+    await vi.waitFor(() => expect(ref.current).not.toBeNull());
+    const ed = ref.current!;
+    expect(ed.root.querySelector('.k-editor-btn-wikilink')).not.toBeNull();
+    expect(ed.root.querySelector('.k-editor-wikilink')?.textContent).toBe('い');
+    render(null, root);
+  });
 });
